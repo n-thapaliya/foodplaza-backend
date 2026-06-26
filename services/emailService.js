@@ -11,6 +11,9 @@ const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+  connectionTimeout: 5000,
+  greetingTimeout: 5000,
+  socketTimeout: 5000,
   disableFileAccess: true,
   disableUrlAccess: true,
 });
@@ -65,12 +68,9 @@ async function sendOTPEmail(email, otp, purpose = 'verification') {
     });
     return { success: true };
   } catch (error) {
-    console.error('Email send error:', error.message);
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`\n==================================================\n🔑 [DEV MODE] EMAIL OTP FOR ${email}: [ ${otp} ]\n==================================================\n`);
-      return { success: true, devMode: true };
-    }
-    return { success: false, error: error.message };
+    console.error('Email send error:', error);
+    console.log(`\n==================================================\n🔑 [OTP FALLBACK] EMAIL OTP FOR ${email}: [ ${otp} ]\n==================================================\n`);
+    return { success: false, error: error?.message || error };
   }
 }
 
