@@ -28,7 +28,7 @@ module.exports = (sequelize) => {
     },
   }, {
     tableName: 'order_items',
-    timestamps: false,
+    timestamps: true,
   });
 
   return OrderItem;

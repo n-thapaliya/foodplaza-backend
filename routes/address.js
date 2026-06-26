@@ -8,7 +8,7 @@ router.use(authenticate);
 
 router.get('/',      ctrl.getAddresses);
 router.post('/',     v.createAddress, validate, ctrl.createAddress);
-router.put('/:id',   ctrl.updateAddress);
+router.put('/:id',   v.updateAddress, validate, ctrl.updateAddress);
 router.delete('/:id',ctrl.deleteAddress);
 
 module.exports = router;

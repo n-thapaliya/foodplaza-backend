@@ -3,16 +3,17 @@ function success(res, message = 'Success', data = {}, statusCode = 200) {
     success: true,
     message,
     data,
+    errors: null,
   });
 }
 
 function error(res, message = 'Error occurred', statusCode = 500, errors = null) {
-  const response = {
+  return res.status(statusCode).json({
     success: false,
     message,
-  };
-  if (errors) response.errors = errors;
-  return res.status(statusCode).json(response);
+    data: null,
+    errors: errors || null,
+  });
 }
 
 module.exports = { success, error };

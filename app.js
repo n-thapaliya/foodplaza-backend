@@ -1,28 +1,65 @@
 require('dotenv').config();
 const express  = require('express');
 const cors     = require('cors');
+const helmet   = require('helmet');
+const rateLimit = require('express-rate-limit');
 const path     = require('path');
 const swaggerUi   = require('swagger-ui-express');
 const swaggerJSDoc = require('swagger-jsdoc');
 
 const authRoutes      = require('./routes/auth');
+const profileRoutes   = require('./routes/profile');
 const foodRoutes      = require('./routes/food');
 const cartRoutes      = require('./routes/cart');
 const favoriteRoutes  = require('./routes/favorites');
 const addressRoutes   = require('./routes/address');
 const orderRoutes     = require('./routes/orders');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
+const { success } = require('./utils/response');
 
 const app = express();
 
+app.set('trust proxy', 1);
+
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+
+const allowedOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:3000,http://localhost:8081,exp://localhost:8081')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const makeRateLimitHandler = (message) => (req, res) => res.status(429).json({
+  success: false,
+  message,
+  data: null,
+  errors: ['Rate limit exceeded'],
+});
+
 // ─── CORS ──────────────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: [
-    process.env.FRONTEND_URL || 'http://localhost:3000',
-    'http://localhost:8081',   // Expo dev server
-    'exp://localhost:8081',
-  ],
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
+}));
+
+app.use('/api', rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
+  limit: parseInt(process.env.RATE_LIMIT_MAX, 10) || 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: makeRateLimitHandler('Too many requests. Please try again later.'),
+}));
+
+app.use('/api/auth', rateLimit({
+  windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
+  limit: parseInt(process.env.AUTH_RATE_LIMIT_MAX, 10) || 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: makeRateLimitHandler('Too many authentication attempts. Please try again later.'),
 }));
 
 // ─── Body parsers ──────────────────────────────────────────────────────────────
@@ -30,7 +67,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ─── Static files (uploaded images) ──────────────────────────────────────────
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(process.env.UPLOAD_PATH || path.join(__dirname, 'uploads')));
 
 // ─── Swagger ──────────────────────────────────────────────────────────────────
 const swaggerOptions = {
@@ -68,9 +105,7 @@ app.get('/api/docs.json', (req, res) => res.json(swaggerSpec));
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'FoodPlaza API is running 🍕',
+  return success(res, 'FoodPlaza API is running', {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
   });
@@ -78,6 +113,7 @@ app.get('/health', (req, res) => {
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
 app.use('/api/auth',      authRoutes);
+app.use('/api/profile',   profileRoutes);
 app.use('/api',           foodRoutes);
 app.use('/api/cart',      cartRoutes);
 app.use('/api/favorites', favoriteRoutes);

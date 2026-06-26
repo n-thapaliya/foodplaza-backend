@@ -12,6 +12,7 @@ async function authenticate(req, res, next) {
     const decoded = verifyAccessToken(token);
     const user = await User.findByPk(decoded.id);
     if (!user) return error(res, 'User not found', 401);
+    if (!user.isActive) return error(res, 'User account is inactive', 403);
     req.user = user;
     next();
   } catch (err) {
@@ -23,7 +24,9 @@ async function authenticate(req, res, next) {
 }
 
 function requireVerified(req, res, next) {
-  // Bypassed for seamless mobile app experience
+  if (!req.user.isVerified) {
+    return error(res, 'Account verification required', 403);
+  }
   next();
 }
 

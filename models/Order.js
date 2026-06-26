@@ -10,6 +10,13 @@ module.exports = (sequelize) => {
       references: { model: 'users', key: 'id' },
       onDelete: 'CASCADE',
     },
+    addressId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: { model: 'addresses', key: 'id' },
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE',
+    },
     totalAmount: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,

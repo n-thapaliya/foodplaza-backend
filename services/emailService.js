@@ -1,14 +1,18 @@
 require('dotenv').config();
 const nodemailer = require('nodemailer');
 
+const smtpPort = parseInt(process.env.SMTP_PORT, 10) || 587;
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT),
-  secure: false,
+  port: smtpPort,
+  secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : smtpPort === 465,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+  disableFileAccess: true,
+  disableUrlAccess: true,
 });
 
 async function sendOTPEmail(email, otp, purpose = 'verification') {
@@ -56,6 +60,8 @@ async function sendOTPEmail(email, otp, purpose = 'verification') {
       to: email,
       subject,
       html,
+      disableFileAccess: true,
+      disableUrlAccess: true,
     });
     return { success: true };
   } catch (error) {
@@ -111,6 +117,8 @@ async function sendWelcomeEmail(email, fullName) {
       to: email,
       subject: `Welcome to ${process.env.APP_NAME || 'FoodPlaza'}!`,
       html,
+      disableFileAccess: true,
+      disableUrlAccess: true,
     });
     return { success: true };
   } catch (error) {

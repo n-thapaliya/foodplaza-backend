@@ -2,7 +2,7 @@ const multer = require('multer');
 const path   = require('path');
 const fs     = require('fs');
 
-const UPLOAD_PATH = process.env.UPLOAD_PATH || './uploads';
+const UPLOAD_PATH = process.env.UPLOAD_PATH || path.join(__dirname, '..', 'uploads');
 
 // Ensure upload directories exist
 ['profiles', 'foods', 'categories'].forEach((dir) => {

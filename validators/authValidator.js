@@ -14,7 +14,7 @@ const login = [
 
 const sendOTP = [
   body('identifier').trim().notEmpty().withMessage('Email or phone is required'),
-  body('channel').isIn(['email', 'sms', 'whatsapp']).withMessage('Channel must be email, sms, or whatsapp'),
+  body('channel').optional().isIn(['email', 'sms', 'whatsapp']).withMessage('Channel must be email, sms, or whatsapp'),
 ];
 
 const verifyOTP = [

@@ -1,4 +1,5 @@
-const { Order, OrderItem, Food, User, Cart } = require('../models');
+const { Op } = require('sequelize');
+const { Order, OrderItem, Food, Cart, Address } = require('../models');
 const { sequelize } = require('../models');
 const { success, error } = require('../utils/response');
 const { getPagination, paginatedResponse } = require('../utils/paginate');
@@ -7,22 +8,54 @@ const { getPagination, paginatedResponse } = require('../utils/paginate');
 async function createOrder(req, res, next) {
   const t = await sequelize.transaction();
   try {
-    const { items, deliveryAddress, paymentMethod, notes, deliveryLat, deliveryLng } = req.body;
+    const { items, addressId, paymentMethod, notes, deliveryLat, deliveryLng } = req.body;
+    let { deliveryAddress } = req.body;
 
-    // Validate and price each item
-    let totalAmount = 0;
-    const enrichedItems = [];
-
-    for (const item of items) {
-      const food = await Food.findByPk(item.foodId, { transaction: t });
-      if (!food) {
+    if (addressId) {
+      const address = await Address.findOne({
+        where: { id: addressId, userId: req.user.id },
+        transaction: t,
+      });
+      if (!address) {
         await t.rollback();
-        return error(res, `Food with ID ${item.foodId} not found`, 404);
+        return error(res, 'Address not found', 404);
       }
-      const lineTotal = parseFloat(food.price) * item.quantity;
-      totalAmount += lineTotal;
-      enrichedItems.push({ food, quantity: item.quantity, price: parseFloat(food.price) });
+      deliveryAddress = [
+        address.house,
+        address.street,
+        address.city,
+        address.state,
+        address.pincode,
+      ].filter(Boolean).join(', ');
     }
+
+    if (!deliveryAddress) {
+      await t.rollback();
+      return error(res, 'Delivery address is required', 422, ['Delivery address is required']);
+    }
+
+    const requestedFoodIds = [...new Set(items.map((item) => Number(item.foodId)))];
+    const foods = await Food.findAll({
+      where: { id: { [Op.in]: requestedFoodIds } },
+      transaction: t,
+    });
+    const foodById = new Map(foods.map((food) => [Number(food.id), food]));
+
+    const missingFoodId = requestedFoodIds.find((foodId) => !foodById.has(foodId));
+    if (missingFoodId) {
+      await t.rollback();
+      return error(res, `Food with ID ${missingFoodId} not found`, 404);
+    }
+
+    let totalAmount = 0;
+    const enrichedItems = items.map((item) => {
+      const food = foodById.get(Number(item.foodId));
+      const quantity = Number(item.quantity);
+      const price = parseFloat(food.price);
+      const lineTotal = price * quantity;
+      totalAmount += lineTotal;
+      return { food, quantity, price };
+    });
 
     // Add delivery fee
     const DELIVERY_FEE = 40;
@@ -31,6 +64,7 @@ async function createOrder(req, res, next) {
     // Create order
     const order = await Order.create({
       userId: req.user.id,
+      addressId: addressId || null,
       totalAmount: parseFloat(totalAmount.toFixed(2)),
       paymentMethod,
       paymentStatus: paymentMethod === 'cod' ? 'pending' : 'paid',
@@ -62,6 +96,9 @@ async function createOrder(req, res, next) {
         model: OrderItem,
         as: 'items',
         include: [{ model: Food, as: 'food', attributes: ['id', 'name', 'image', 'price'] }],
+      }, {
+        model: Address,
+        as: 'address',
       }],
     });
 
@@ -87,6 +124,9 @@ async function getOrders(req, res, next) {
         model: OrderItem,
         as: 'items',
         include: [{ model: Food, as: 'food', attributes: ['id', 'name', 'image', 'price'] }],
+      }, {
+        model: Address,
+        as: 'address',
       }],
       order: [['createdAt', 'DESC']],
       limit,
@@ -109,6 +149,9 @@ async function getOrderById(req, res, next) {
         model: OrderItem,
         as: 'items',
         include: [{ model: Food, as: 'food', attributes: ['id', 'name', 'image', 'price', 'isVeg'] }],
+      }, {
+        model: Address,
+        as: 'address',
       }],
     });
     if (!order) return error(res, 'Order not found', 404);

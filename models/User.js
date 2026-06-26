@@ -38,6 +38,10 @@ module.exports = (sequelize) => {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
+    isActive: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+    },
     otpCode: {
       type: DataTypes.STRING(10),
       allowNull: true,
@@ -84,6 +88,7 @@ module.exports = (sequelize) => {
     delete values.password;
     delete values.otpCode;
     delete values.otpExpiry;
+    delete values.otpPurpose;
     delete values.refreshToken;
     return values;
   };

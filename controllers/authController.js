@@ -5,7 +5,6 @@ const { success, error } = require('../utils/response');
 const { sendOTPEmail, sendWelcomeEmail } = require('../services/emailService');
 const { sendOTPSMS, sendOTPWhatsApp } = require('../services/smsService');
 const { Op } = require('sequelize');
-const path = require('path');
 
 // ─── Helper: find user by email or phone ─────────────────────────────────────
 async function findByIdentifier(identifier) {
@@ -53,14 +52,19 @@ async function register(req, res, next) {
       otpCode: otp,
       otpExpiry: getOTPExpiry(),
       otpPurpose: 'verify',
-      isVerified: true,
+      isVerified: false,
+      isActive: true,
     });
 
-    await sendOTPEmail(user.email, otp, 'verify');
+    const emailResult = await sendOTPEmail(user.email, otp, 'verify');
+    if (!emailResult.success) {
+      console.error(`Registration OTP email failed for user ${user.id}: ${emailResult.error}`);
+    }
 
     return success(res, 'Registered successfully. Check your email for OTP.', {
       userId: user.id,
       email: user.email,
+      otpEmailSent: Boolean(emailResult.success),
     }, 201);
   } catch (err) {
     next(err);
@@ -76,12 +80,13 @@ async function login(req, res, next) {
     if (!user || !(await user.comparePassword(password))) {
       return error(res, 'Invalid email or password', 401);
     }
+    if (!user.isActive) return error(res, 'User account is inactive', 403);
 
     const { accessToken, refreshToken } = generateTokenPair(user);
     await user.update({ refreshToken });
 
     return success(res, 'Login successful', {
-      user,
+      user: user.toJSON(),
       accessToken,
       refreshToken,
     });
@@ -139,7 +144,7 @@ async function verifyOTP(req, res, next) {
     await user.update({ refreshToken });
 
     return success(res, 'Account verified successfully', {
-      user,
+      user: user.toJSON(),
       accessToken,
       refreshToken,
     });
@@ -232,6 +237,7 @@ async function refreshToken(req, res, next) {
     if (!user || user.refreshToken !== token) {
       return error(res, 'Refresh token mismatch', 401);
     }
+    if (!user.isActive) return error(res, 'User account is inactive', 403);
 
     const accessToken = generateAccessToken({ id: user.id, email: user.email });
     return success(res, 'Token refreshed', { accessToken });
@@ -242,7 +248,7 @@ async function refreshToken(req, res, next) {
 
 // GET /api/auth/profile
 async function getProfile(req, res) {
-  return success(res, 'Profile fetched', { user: req.user });
+  return success(res, 'Profile fetched', { user: req.user.toJSON() });
 }
 
 // PUT /api/auth/profile
@@ -262,7 +268,7 @@ async function updateProfile(req, res, next) {
     }
 
     await req.user.update(updateData);
-    return success(res, 'Profile updated', { user: req.user });
+    return success(res, 'Profile updated', { user: req.user.toJSON() });
   } catch (err) {
     next(err);
   }

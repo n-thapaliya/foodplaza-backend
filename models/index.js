@@ -59,6 +59,7 @@ Favorite.belongsTo(Food, { foreignKey: 'foodId', as: 'food' });
 
 // Order associations
 Order.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+Order.belongsTo(Address, { foreignKey: 'addressId', as: 'address' });
 Order.hasMany(OrderItem, { foreignKey: 'orderId', as: 'items', onDelete: 'CASCADE' });
 
 // OrderItem associations
@@ -67,6 +68,7 @@ OrderItem.belongsTo(Food, { foreignKey: 'foodId', as: 'food' });
 
 // Address associations
 Address.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+Address.hasMany(Order, { foreignKey: 'addressId', as: 'orders', onDelete: 'SET NULL' });
 
 module.exports = {
   sequelize,
