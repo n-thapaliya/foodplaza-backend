@@ -10,7 +10,10 @@ async function getCart(req, res, next) {
       order: [['createdAt', 'DESC']],
     });
 
-    const subtotal = items.reduce((sum, item) => sum + parseFloat(item.food.price) * item.quantity, 0);
+    const subtotal = items.reduce((sum, item) => {
+      const price = item.food ? parseFloat(item.food.price) : 0;
+      return sum + price * item.quantity;
+    }, 0);
 
     return success(res, 'Cart fetched', {
       items,
